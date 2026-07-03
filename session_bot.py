@@ -5,10 +5,12 @@ import asyncio
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-# 👇 YAHAN APNI DETAILS DAALO 👇
-API_ID = 1234567  # Apna asli API ID (Bina quotes ke)
-API_HASH = "tumhara_api_hash_yahan"  # Apna asli API Hash (Quotes ke andar)
-BOT_TOKEN = "tumhara_bot_token_yahan"  # BotFather wala Token (Quotes ke andar)
+import os
+
+API_ID = int(os.environ.get("API_ID", 0))
+API_HASH = os.environ.get("API_HASH", "")
+BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+
 
 # 🔥 REPLIT/RENDER KEEP-ALIVE JUGAAD 🔥
 class KeepAliveHandler(BaseHTTPRequestHandler):
