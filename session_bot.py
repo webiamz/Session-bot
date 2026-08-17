@@ -1,170 +1,124 @@
 import os
-import asyncio
 import threading
-from telethon import TelegramClient, events
-from telethon.sessions import StringSession
-from telethon.errors import SessionPasswordNeededError
 from http.server import BaseHTTPRequestHandler, HTTPServer
+from telethon import TelegramClient, events, Button
 
-API_ID = int(os.environ.get("API_ID", 6))
-API_HASH = os.environ.get("API_HASH", "eb06d4abfb49dc3eeb1aeb98ae0f581e")
+API_ID = int(os.environ.get("API_ID", "6"))
+API_HASH = os.environ.get("API_HASH", "")
 BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
+OWNER_ID = 7998217405
 
-# 🔥 REPLIT/RENDER KEEP-ALIVE JUGAAD 🔥
+if not BOT_TOKEN:
+    raise RuntimeError("BOT_TOKEN is missing")
+if not API_HASH:
+    raise RuntimeError("API_HASH is missing")
+
 class KeepAliveHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
-        self.send_header('Content-type', 'text/html')
+        self.send_header("Content-type", "text/plain; charset=utf-8")
         self.end_headers()
-        self.wfile.write(b"Session Generator & Spy Bot is Alive 24/7!")
-        
-    def log_message(self, format, *args):
+        self.wfile.write(b"Session Bot is online")
+
+    def log_message(self, *_):
         pass
 
 def run_keep_alive():
     try:
-        server = HTTPServer(('0.0.0.0', 8080), KeepAliveHandler)
-        server.serve_forever()
+        HTTPServer(("0.0.0.0", 8080), KeepAliveHandler).serve_forever()
     except Exception:
         pass
 
 bot = TelegramClient("bot_session", API_ID, API_HASH)
-sessions = {}
 
-@bot.on(events.NewMessage)
-async def handle_message(event):
-    chat_id = event.chat_id
-    text = event.text.strip()
-    
-    # 🔥 NAYA SPY COMMAND (PRIVATE GROUPS SUPPORTED) 🔥
-    if text.startswith("/spy"):
-        try:
-            parts = text.split("|")
-            if len(parts) != 2:
-                await event.reply("❌ **Galat Format!** Aise bhejo:\n`/spy SESSION_STRING | -1001234567890`")
-                return
-            
-            cmd_part = parts[0].replace("/spy", "").strip()
-            group_raw = parts[1].strip()
+HELP_TEXT = (
+    "🧭 **Command Center**\n\n"
+    "**/start** — Main menu\n"
+    "**/tele** — Session generator guide\n"
+    "**/telegram** — Owner-only generator guide\n"
+    "**/help** — Commands & security\n"
+    "**/cancel** — Cancel current operation\n\n"
+    "🔐 OTP, 2FA passwords and session strings are never collected by this bot.\n"
+    "For account safety, session generation is performed locally on your own device."
+)
 
-            if not cmd_part or not group_raw:
-                await event.reply("❌ Session String ya Group ID missing hai!")
-                return
+START_TEXT = (
+    "✨ **Session Utility Bot**\n\n"
+    "A clean Telethon utility for creating sessions locally and safely.\n\n"
+    "Choose an option below 👇"
+)
 
-            # 🔥 PRIVATE GROUP ID FIX 🔥
-            target_group = group_raw
-            if group_raw.startswith("-100") or group_raw.replace("-","").isdigit():
-                try:
-                    target_group = int(group_raw)
-                except ValueError:
-                    pass
+async def send_menu(event):
+    await event.respond(
+        START_TEXT,
+        buttons=[
+            [Button.inline("🔐 Session Guide", b"session"), Button.inline("📖 Help", b"help")],
+            [Button.inline("🛡️ Security", b"security")],
+        ],
+    )
 
-            msg = await event.reply(f"🔍 **Spy Mode Active!**\nConnecting to target...")
+@bot.on(events.NewMessage(pattern=r"^/start$"))
+async def start(event):
+    await send_menu(event)
 
-            spy_client = TelegramClient(
-                StringSession(cmd_part), 
-                API_ID, 
-                API_HASH,
-                device_model="iPhone 15 Pro Max",
-                system_version="iOS 17.5",
-                app_version="10.14.1"
-            )
-            await spy_client.connect()
-            
-            if not await spy_client.is_user_authorized():
-                await msg.edit("❌ **Session Invalid hai!** Naya session banao.")
-                return
-            
-            await msg.edit(f"✅ Login Success! Bhej raha hu `/extols` in Private Group...")
-            await spy_client.send_message(target_group, "/extols")
-            
-            await msg.edit("⏳ `/extols` bhej diya! Zoro ke reply ka 5 second wait kar raha hu...")
-            await asyncio.sleep(5)
+@bot.on(events.NewMessage(pattern=r"^/help$"))
+async def help_cmd(event):
+    await event.respond(HELP_TEXT)
 
-            messages = await spy_client.get_messages(target_group, limit=3)
-            reply_text = "📥 **Aakhiri 3 Messages Group Se:**\n━━━━━━━━━━━━━━━━━━━━\n"
-            
-            for m in messages:
-                sender = await m.get_sender()
-                name = getattr(sender, 'first_name', 'Unknown') if sender else 'Unknown'
-                msg_text = m.text or "[No Text / Media]"
-                reply_text += f"👤 **{name}**:\n`{msg_text}`\n\n"
+@bot.on(events.NewMessage(pattern=r"^/cancel$"))
+async def cancel_cmd(event):
+    await event.respond("✅ No interactive credential-collection flow is running.")
 
-            reply_text += "━━━━━━━━━━━━━━━━━━━━\n🏁 **Spy Test Complete!**"
-            await event.reply(reply_text)
-            await spy_client.disconnect()
-            
-        except Exception as e:
-            await event.reply(f"❌ **Error:** {e}\n*(Agar entity error aaye toh check karo account us group me add hai ya nahi)*")
+@bot.on(events.NewMessage(pattern=r"^/tele$"))
+async def tele_cmd(event):
+    await event.respond(
+        "🔐 **/tele — Session Generator**\n\n"
+        "This bot does not ask you to send your Telegram OTP, 2FA password, or session string.\n\n"
+        "Run the included `local_session.py` on your own PC/phone environment, enter your credentials there, and keep the generated session locally.\n\n"
+        "⚠️ Never paste a session string into a public/group chat."
+    )
+
+@bot.on(events.NewMessage(pattern=r"^/telegram$"))
+async def telegram_cmd(event):
+    if event.sender_id != OWNER_ID:
+        await event.respond("⛔ **Access denied.** This command is owner-only.")
         return
+    await event.respond(
+        "👑 **Owner Session Utility**\n\n"
+        "Owner ID verified.\n\n"
+        "For security, the bot still will not receive your OTP/2FA/session.\n"
+        "Use `local_session.py` locally to create the Telethon session."
+    )
 
-    # --- NORMAl SESSION GENERATOR LOGIC ---
-    if text == "/start":
-        await event.reply(
-            "🔥 **SlotOps Session & Spy Bot** 🔥\n\n"
-            "👉 Naya Session Banane ke liye:\nApna Number bhejo (e.g., `+919876543210`)\n\n"
-            "👉 Session Test Karne ke liye:\n`/spy NAYA_SESSION_STRING | -1001234567890`"
+@bot.on(events.CallbackQuery)
+async def callbacks(event):
+    data = event.data.decode()
+    if data == "session":
+        await event.edit(
+            "🔐 **Safe Session Flow**\n\n"
+            "1. Download/run `local_session.py`.\n"
+            "2. Enter API ID + API Hash locally.\n"
+            "3. Enter your phone number locally.\n"
+            "4. Enter the Telegram OTP locally.\n"
+            "5. If enabled, enter 2FA locally.\n"
+            "6. The session string is printed locally only.\n\n"
+            "🚫 Do not send any of these credentials to this bot."
         )
-        sessions[chat_id] = {"step": "phone"}
-        return
+    elif data == "help":
+        await event.edit(HELP_TEXT)
+    elif data == "security":
+        await event.edit(
+            "🛡️ **Security Rules**\n\n"
+            "• Never share OTPs.\n"
+            "• Never share your 2FA password.\n"
+            "• Treat a Telethon session string like a password.\n"
+            "• Keep session files private.\n"
+            "• Do not use sessions belonging to other people."
+        )
+    await event.answer()
 
-    if chat_id not in sessions: return
-    state = sessions[chat_id]
-    
-    if state["step"] == "phone":
-        phone = text
-        await event.reply("⏳ OTP request bhej raha hu, wait karo...")
-        client = TelegramClient(StringSession(), API_ID, API_HASH, device_model="iPhone 15 Pro Max", system_version="iOS 17.5", app_version="10.14.1")
-        await client.connect()
-        try:
-            send_code = await client.send_code_request(phone)
-            state["client"] = client
-            state["phone"] = phone
-            state["phone_code_hash"] = send_code.phone_code_hash
-            state["step"] = "otp"
-            await event.reply("✅ **OTP Telegram par bhej diya gaya hai!**\n⚠️ OTP ko space ke sath bhejo (e.g., `1 2 3 4 5 6`).")
-        except Exception as e:
-            await event.reply(f"❌ Error: {e}")
-            del sessions[chat_id]
-            
-    elif state["step"] == "otp":
-        otp = text.replace(" ", "")
-        client = state["client"]
-        try:
-            await client.sign_in(state["phone"], otp, phone_code_hash=state["phone_code_hash"])
-            session_string = client.session.save()
-            await event.reply(f"🎉 **Success! Naya Session:**\n\n`{session_string}`")
-            await client.disconnect()
-            del sessions[chat_id]
-        except SessionPasswordNeededError:
-            state["step"] = "password"
-            await event.reply("🔒 **Two-Step Verification (2FA)** on hai! Apna password bhejo:")
-        except Exception as e:
-            await event.reply(f"❌ Error: {e}")
-            await client.disconnect()
-            del sessions[chat_id]
-            
-    elif state["step"] == "password":
-        password = text
-        client = state["client"]
-        try:
-            await client.sign_in(password=password)
-            session_string = client.session.save()
-            await event.reply(f"🎉 **Success! Naya Session:**\n\n`{session_string}`")
-            await client.disconnect()
-            del sessions[chat_id]
-        except Exception as e:
-            await event.reply(f"❌ Password Error: {e}")
-            await client.disconnect()
-            del sessions[chat_id]
-
-# 🚀 STARTING SERVICES
-print("⚙️ Keep-Alive server start ho raha hai...")
-t = threading.Thread(target=run_keep_alive, daemon=True)
-t.start()
-
-print("🤖 Session & Spy Bot is LIVE!")
-loop = asyncio.new_event_loop()
-asyncio.set_event_loop(loop)
+print("⚙️ Keep-alive server starting...")
+threading.Thread(target=run_keep_alive, daemon=True).start()
+print("🤖 Session Utility Bot is LIVE!")
 bot.start(bot_token=BOT_TOKEN)
 bot.run_until_disconnected()
